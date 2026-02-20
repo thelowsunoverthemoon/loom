@@ -236,3 +236,5 @@ FOR /L %%? in () DO (
 ```
 
 Note that in ```MAIN``` I use the (slightly) obscure ```CON``` device, which refers to the console directly. This is because we have redirected stdin into a file. The full file can be found [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/ring.bat).
+
+Interestingly, user Aacini also developed a multithread framework using a similar approach [here](https://www.dostips.com/forum/viewtopic.php?t=6601&start=15).
