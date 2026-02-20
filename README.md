@@ -1,6 +1,6 @@
 # Parallel Computation in Batch Script
 
-My goal was to implement the *reduce* operation in Batch Script, something commonly used in parallel programming. The basic idea is to create a parallel version of combining all the values in an array using some combining function. For example, given an array of numbers and an addition function:
+My goal was to implement the *reduce* operation in Batch Script, something commonly used in parallel programming, for fun. The basic idea is to create a parallel version of combining all the values in an array using some combining function. For example, given an array of numbers and an addition function:
 
     1 2 3 4 5
 
@@ -8,7 +8,7 @@ Becomes
     
     1 + 2 + 3 + 4 + 5
 
-Doing this in parallel is intuitive. The naive way would be to have processes in a tree structure. For example, if we split our array into 4 parts, we would have:
+Doing this in parallel is intuitive. The naive way would be to have more processes than leaves, in a tree structure. For example, if we split our array into 4 parts, we would have:
 
 ```
     P
@@ -165,9 +165,72 @@ CALL :CREATE_THREADS 4
 
 The full script is available to see [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/parallel.bat). There is a problem, however. While this works well, it is specialized to the ```reduce``` operation. If one were to want to implement a ```scan``` operation, which typically has both a upward and downward pass, then this solution falls apart. The reason is that pipes are unidirectional in Batch Script, so there is no way to send information "back".
 
-An interesting solution to this problem (and it is probably faster to use temporary files 
+An interesting solution to this problem (and it is probably faster to use temporary files, but I just think this is neat) is to implement message passing. We can emulate a ring network topology, and imagine that the pipes are unidirectional links between the processes. To loop back, we can simply redirect to a file at the end, and direct that file into the first process. In this way, there is no need to create and delete temporary files as messages; there will only be ```n``` files created. We can pass in information about parents, children, etc. as parameters to the processes so they know who to send messages to. Thus, for ```n = 2```, we get
+```
+"C:\Users\test\parallel.bat" MAIN < "C:\Users\test\AppData\Local\Temp\parallel_sig.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig_2.txt" | "C:\Users\test\parallel.bat" THREAD 2 1 "" "1, 1, 20000" <"C:\Users\test\AppData\Local\Temp\parallel_sig_2.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig_1.txt" | "C:\Users\test\parallel.bat" THREAD 1 0 "2 " "1, 1, 20000" < "C:\Users\test\AppData\Local\Temp\parallel_sig_1.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig.txt"
+```
 
+Furthermore, each process will need to have the previous processes file directed into them, and be directed into their own file. The reason is because we don't want ```SET /P``` to be blocking. This is because we still want the process to loop in case of something (for example, the computation has ended so the process needs to exit). The idea is, we can ```ECHO``` a message with an id. If the process doesn't match the id, it can ```ECHO``` it again to the next process, and the next, until it reaches the correct process. If not, it can just consume the message. Naturally, this is a pretty ugly solution because messages can be lost easily. Hence, we don't just send 1 message, but many messages. In this case, I think it is more natural to use a recursive solution to create this structure:
 
-https://www.dostips.com/forum/viewtopic.php?t=6601&start=15
-is interesting
-Note that in ```MAIN``` I use the (slightly) obscure ```CON``` device, which refers to the console directly. This i
+```Batch
+:CREATE <n>
+COPY NUL "%TEMP%\%~n0_sig.txt" >NUL
+SET /A %inc.id%
+CALL :CREATE_R %1 %id% 0
+SET "ring=^< "%TEMP%\%~n0_sig.txt" %ring% ^> "%TEMP%\%~n0_sig.txt""
+GOTO :EOF
+
+:CREATE_R <n> <id> <parent> <child>
+IF "%1" == "1" (
+    COPY NUL "%TEMP%\%~n0_sig_%2.txt" >NUL
+    SET "ring=!ring! > "%TEMP%\%~n0_sig_%2.txt" ^| "%~F0" THREAD %2 %3 %4 !data.%2! < "%TEMP%\%~n0_sig_%2.txt""
+    GOTO :EOF
+)
+SET /A "left=%1 / 2", "right=%1 - left", %inc.id%, "id.temp=id"
+SETLOCAL
+CALL :CREATE_R %right% %id% %2 ""
+ENDLOCAL & SET "id.save=%id.save%" & SET "ring=%ring%"
+CALL :CREATE_R %left% %2 %3 "%id.temp% %~4"
+GOTO :EOF
+```
+
+In ```THREAD```, the code is much uglier. We use string substitution as a way to check for children messages without loops; once we get all the children loops, we continually send messages of our results. Because we need to continually send messages, we also need a mechanism to detect when the computation is finished. I use a temporary file for this.
+
+```Batch
+:THREAD
+COPY NUL %id%.ready >NUL
+SET "need= %children%"
+FOR /L %%X in (%data%) DO (
+    SET /A "sum+=%%X"
+)
+IF "%children%" == "" (
+    SET "send=1"
+)
+FOR /L %%? in () DO (
+    IF exist "%~dpn0.quit" (
+        EXIT
+    )
+    SET /P "msg="
+    IF defined send (
+        IF defined msg (
+            ECHO !msg!
+        )
+        ECHO %id% !sum!
+    ) else IF defined msg (
+        FOR /F "tokens=1,*" %%A in ("!msg!") DO (
+            IF "!need: %%A =!" == "!need!" (
+                ECHO !msg!
+            ) else (
+                SET /A "sum+=%%B"
+                SET "need=!need: %%A=!"
+                IF "!need!" == " " (
+                    SET "send=1"
+                )
+            )
+        )
+        SET "msg="
+    )
+)
+```
+
+Note that in ```MAIN``` I use the (slightly) obscure ```CON``` device, which refers to the console directly. This is because we have redirected stdin into a file. The full file can be found [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/ring.bat).
