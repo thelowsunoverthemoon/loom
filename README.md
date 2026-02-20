@@ -63,7 +63,7 @@ This represents the tree seen above:
 P  P P  P
 ```
 
-The great thing about this solution is that it is naturally blocking. There is no need for code to "wait" until the children are finished. The SET /Ps handle it for you. Thus, the greatest difficulty is in actually constructing this tree. This is not too hard:
+The great thing about this solution is that it is naturally blocking. There is no need for code to "wait" until the children are finished. The SET /Ps handle it for you. Furthermore, the great thing about Batch Script is that everything is a string; we can build this tree as a string, then run it by using the variable directly. Thus, the greatest difficulty is in actually constructing this tree.
 
 ```Batch
 :CREATE_THREADS <n>
@@ -106,3 +106,5 @@ IF "!has.child!" == "0" (
 )
 GOTO :EOF
 ```
+
+This is a common algorithm to build this sort of tree. 
