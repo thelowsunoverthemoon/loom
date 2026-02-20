@@ -107,4 +107,12 @@ IF "!has.child!" == "0" (
 GOTO :EOF
 ```
 
-This is a common algorithm to build this sort of tree. 
+This is a common algorithm to build this sort of tree, that doesn't rely on recursion. For leaf nodes, we can use
+
+```Batch
+START /B "" "%~F0" THREAD !has.child! %1
+```
+
+This command creates a starts a process with /B
+
+CREATE_THREADS creates a construction of thi 
