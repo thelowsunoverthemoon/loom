@@ -1,6 +1,101 @@
-# Parallel Computation in Batch Script
+<p align="center">
+  <img src="img/logo.png">
+</p>
+<p align="center">
+  <b>Parallel Computing Framework in Batch</b>
+</p>
 
-My goal was to implement the *reduce* operation in Batch Script, something commonly used in parallel programming, for fun. The basic idea is to create a parallel version of combining all the values in an array using some combining function. For example, given an array of numbers and an addition function:
+## Features
+
+* Supports scan, reduce, and message passing in pure Batch Script
+* Implements parallel reduce by using runtime code generation to encode trees created through Schwartz's algorithm
+* Implements parallel scan using efficient two pass approach inspired by Blelloch's algorithm
+* Emulates message passing in a ring network topology for coordinating multiple processes
+* Note : this project is just for fun to show interesting usages of Batch Script
+
+
+## Examples
+
+See examples [here](ex) on how to use! Note for each example you must have [loom.bat](loom/loom.bat) in the same directory.
+
+| Name  | Demo |
+| ------------- | ------------- |
+| [reduce_add](ex/reduce_add.bat)  | Reduce operation finding addition of all elements  |
+| [reduce_min_max](ex/reduce_min_max.bat)  | Reduce operation finding minimum and maximum of random data  | 
+| [scan_concat](ex/scan_concat.bat)  | Scan operation finding concatenated string prefix for each thread  | 
+| [scan_max](ex/scan_max.bat)  | Scan operation finding prefix max for each thread  |
+| [ring_reduce](ex/ring_reduce.bat)  | Utilizes general message passing to implement [reduce_add](ex/reduce_add.bat) | 
+
+For example, here is the output for [scan_max](ex/scan_max.bat) on my machine:
+```
+Process 0 values: 0 0 0 0 0 0 0 0 0 0, local max=0
+Process 1 values: 1 2 3 4 5 6 7 8 9 10, local max=10
+Process 3 values: 3 6 9 12 15 18 21 24 27 30, local max=30
+Process 2 values: 2 4 6 8 10 12 14 16 18 20, local max=20
+Process 4 values: 4 8 12 16 20 24 28 32 36 40, local max=40
+Process 5 values: 5 10 15 20 25 30 35 40 45 50, local max=50
+Process 6 values: 6 12 18 24 30 36 42 48 54 60, local max=60
+Process 7 values: 7 14 21 28 35 42 49 56 63 70, local max=70
+Process 8 values: 8 16 24 32 40 48 56 64 72 80, local max=80
+Process 9 values: 9 18 27 36 45 54 63 72 81 90, local max=90
+Total Max : 90
+0 Prefix : 0
+1 Prefix : 0
+2 Prefix : 10
+3 Prefix : 20
+4 Prefix : 30
+5 Prefix : 40
+6 Prefix : 50
+7 Prefix : 60
+8 Prefix : 70
+9 Prefix : 80
+```
+
+
+## Benchmarks
+
+Benchmarking can be done using [bench.ps1](benchmark/bench.ps1). Note that to run the current setup you must have [loom.bat](loom/loom.bat) in the same directory. The script finds the speedup between sequential and parallel commands by comparing the median times (in milliseconds) of ```n``` runs. The default setup is comparing the parallel add versus the sequential add. However, you can change the parameters for your own files.
+
+| Parameter    | Type   | Default              | Description                                                                         |
+| ------------ | ------ | -------------------- | ----------------------------------------------------------------------------------- |
+| `Sequential` | string | `.\seq_add.bat`      | Path to the sequential benchmark script                                             |
+| `Parallel`   | string | `.\parallel_add.bat` | Path to the parallel benchmark script                                               |
+| `Runs`       | int    | `7`                  | Number of benchmark iterations used for timing (median is computed over these runs) |
+
+On my machine, this is what I get:
+
+```
+Benchmarking
+Sequential: .\seq_add.bat
+Parallel  : .\parallel_add.bat
+Runs      : 7
+
+Measuring sequential runs...
+- Run 1 : 9965.29 ms
+- Run 2 : 9344.84 ms
+- Run 3 : 10192.06 ms
+- Run 4 : 10188.37 ms
+- Run 5 : 9783.59 ms
+- Run 6 : 10803.3 ms
+- Run 7 : 10099.13 ms
+
+Measuring parallel runs...
+- Run 1 : 1869.33 ms
+- Run 2 : 1853.25 ms
+- Run 3 : 1771.84 ms
+- Run 4 : 1702.01 ms
+- Run 5 : 1712.91 ms
+- Run 6 : 1916.57 ms
+- Run 7 : 1818.06 ms
+
+Sequential median : 10099.13 ms
+Parallel median   : 1818.06 ms
+Speedup           : 5.555x
+```
+
+## How it Works
+
+My goal was to implement *reduce*, *scan* and *message passing* in Batch Script, components commonly used in parallel programming. The basic idea is to create a parallel version of combining all the values in an array using some combining function. For example, given an array of numbers and an addition function:
 
     1 2 3 4 5
 
@@ -66,19 +161,19 @@ P  P P  P
 The great thing about this solution is that it is naturally blocking. There is no need for code to *wait* until the children are finished. The ```SET /P```s handle it for you. Furthermore, the great thing about Batch Script is that everything is a string; we can build this tree as a string, then run it by using the variable directly. Thus, the greatest difficulty is in actually constructing this tree.
 
 ```Batch
-:CREATE_THREADS <n>
+:CREATE_TREE <n>
 SETLOCAL
 SET /A "total=%1", "start=%1 - 1"
 FOR /L %%Q in (%start%, -1, 0) DO (
     SET /A "has.child=0", "stride=1"
-    CALL :CREATE_THREADS_LOOP %%Q
+    CALL :CREATE_TREE_LOOP %%Q
 
 )
 SET "branch.0=(!branch.0!)^| "%~F0" MAIN !has.child!"
 ENDLOCAL & SET "threads=%branch.0%"
 GOTO :EOF
 
-:CREATE_THREADS_LOOP
+:CREATE_TREE_LOOP
 IF %stride% GEQ %total% (
     GOTO :EOF
 )
@@ -97,7 +192,7 @@ IF "!need.child!" == "0" (
         SET "branch.%1=!branch.%1:~1!"
     )
     SET /A "stride*=2"
-    GOTO :CREATE_THREADS_LOOP
+    GOTO :CREATE_TREE_LOOP
 )
 IF "!has.child!" == "0" (
     SET "branch.%1=START /B "" "%~F0" THREAD !has.child! %1"
@@ -123,7 +218,7 @@ IF not "%1" == "" (
 )
 ```
 
-In this way, we can run multiple different processes without needing different files. ```!has.child!``` refers to how many children we have (how many ```SET /P```s to wait for) and the ```%1``` refers to the id of the thread. This is purely for debugging purposes, and is not needed. Overall, ```CREATE_THREADS``` takes in a parameter ```n``` (must be even) that generates ```n``` threads, and constructs this tree into the ```%threads%``` variable. Here's the variable value with ```n = 4```:
+In this way, we can run multiple different processes without needing different files. ```!has.child!``` refers to how many children we have (how many ```SET /P```s to wait for) and the ```%1``` refers to the id of the thread. This is purely for debugging purposes, and is not needed. Overall, ```CREATE_TREE``` takes in a parameter ```n``` (must be even) that generates ```n``` threads, and constructs this tree into the ```%threads%``` variable. Here's the variable value with ```n = 4```:
 
 ```Batch
 (START /B "" "C:\Users\test\parallel.bat" THREAD 0 1&((START /B "" "C:\Users\test\parallel.bat" THREAD 0 3)|START /B "" "C:\Users\test\parallel.bat" THREAD 1 2))| "C:\Users\test\parallel.bat" MAIN 2
@@ -159,13 +254,15 @@ EXIT
 What's left is actually running it. Since this is just a variable, you can generate it once, and run it whenever:
 
 ```Batch
-CALL :CREATE_THREADS 4
+CALL :CREATE_TREE 4
 %threads%
 ```
 
-The full script is available to see [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/parallel.bat). There is a problem, however. While this works well, it is specialized to the ```reduce``` operation. If one were to want to implement a ```scan``` operation, which typically has both a upward and downward pass, then this solution falls apart. The reason is that pipes are unidirectional in Batch Script, so there is no way to send information "back".
+To implement ```scan```, one can use the ```WAITFOR``` command (though a busy loop would work too) and use temporary files to implement the downward pass. Each thread only has one parent, so they can each wait for the parent to create the temporary file with the prefix. Note that in the examples a ```exclusive``` scan is implemented.
 
-An interesting solution to this problem (and it is probably faster to use temporary files, but I just think this is neat) is to implement message passing. We can emulate a ring network topology, and imagine that the pipes are unidirectional links between the processes. To loop back, we can simply redirect to a file at the end, and direct that file into the first process. In this way, there is no need to create and delete temporary files as messages; there will only be ```n``` files created (in the case of a theoretical ```scan``` operation, at least). We can pass in information about parents, children, etc. as parameters to the processes so they know who to send messages to. Thus, for ```n = 2```, we get
+ There is a problem, however. While this works well, it is specialized to the ```reduce``` operation and ```scan``` operation (I only used temporary files because they would only be used once in the downward pass, not as general messages). If one wanted to implement message passing, then this solution falls apart. The reason is that pipes are unidirectional in Batch Script, so there is no way to send information "back".
+
+An interesting solution to this problem is to use ```SET /P``` and redirect to temp files. We can emulate a ring network topology, and imagine that the pipes are unidirectional links between the processes. To loop back, we can simply redirect to a file at the end, and direct that file into the first process. In this way, there is no need to create and delete temporary files as messages; there will only be ```n``` files created (in the case of a theoretical ```scan``` operation, at least). We can pass in information about parents, children, etc. as parameters to the processes so they know who to send messages to. Thus, for ```n = 2```, we get
 ```
 "C:\Users\test\parallel.bat" MAIN < "C:\Users\test\AppData\Local\Temp\parallel_sig.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig_2.txt" | "C:\Users\test\parallel.bat" THREAD 2 1 "" "1, 1, 20000" <"C:\Users\test\AppData\Local\Temp\parallel_sig_2.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig_1.txt" | "C:\Users\test\parallel.bat" THREAD 1 0 "2 " "1, 1, 20000" < "C:\Users\test\AppData\Local\Temp\parallel_sig_1.txt" > "C:\Users\test\AppData\Local\Temp\parallel_sig.txt"
 ```
@@ -235,6 +332,6 @@ FOR /L %%? in () DO (
 )
 ```
 
-Note that in ```MAIN``` I use the (slightly) obscure ```CON``` device, which refers to the console directly. This is because we have redirected stdin into a file. The full file can be found [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/ring.bat).
+Note that overall I use the (slightly) obscure ```CON``` device, which refers to the console directly. This is because we have redirected stdin into a file. The full file can be found [here](https://github.com/thelowsunoverthemoon/parallel.bat/blob/main/ring.bat).
 
 Interestingly, user Aacini also developed a multithread framework using a similar approach [here](https://www.dostips.com/forum/viewtopic.php?t=6601&start=15).
