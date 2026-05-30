@@ -20,13 +20,13 @@ See examples [here](ex) on how to use! Note for each example you must have [loom
 
 | Name  | Demo |
 | ------------- | ------------- |
-| [reduce_add](ex/reduce_add.bat)  | Reduce operation finding addition of all elements  |
-| [reduce_min_max](ex/reduce_min_max.bat)  | Reduce operation finding minimum and maximum of random data  | 
-| [scan_concat](ex/scan_concat.bat)  | Scan operation finding concatenated string prefix for each thread  | 
-| [scan_max](ex/scan_max.bat)  | Scan operation finding prefix max for each thread  |
-| [ring_reduce](ex/ring_reduce.bat)  | Utilizes general message passing to implement [reduce_add](ex/reduce_add.bat) | 
+| [reduce_add](ex/reduce/reduce_add.bat)  | Reduce operation finding addition of all elements  |
+| [reduce_min_max](ex/reduce/reduce_min_max.bat)  | Reduce operation finding minimum and maximum of random data  | 
+| [scan_concat](ex/scan/scan_concat.bat)  | Scan operation finding concatenated string prefix for each thread  | 
+| [scan_max](ex/scan/scan_max.bat)  | Scan operation finding prefix max for each thread  |
+| [ring_reduce](ex/ring/ring_reduce.bat)  | Utilizes general message passing to implement [reduce_add](ex/reduce_add.bat) | 
 
-For example, here is the output for [scan_max](ex/scan_max.bat) on my machine:
+For example, here is the output for [scan_max](ex/scan/scan_max.bat) on my machine:
 ```
 Process 0 values: 0 0 0 0 0 0 0 0 0 0, local max=0
 Process 1 values: 1 2 3 4 5 6 7 8 9 10, local max=10
