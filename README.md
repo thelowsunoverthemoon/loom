@@ -7,7 +7,7 @@
 
 ## Features
 
-* Supports scan, reduce, and message passing in pure Batch Script
+* Supports parallel scan, parallel reduce, and message passing in pure Batch Script
 * Implements parallel reduce by using runtime code generation to encode trees created through Schwartz's algorithm
 * Implements parallel scan using efficient two pass approach inspired by Blelloch's algorithm
 * Emulates message passing in a ring network topology for coordinating multiple processes
