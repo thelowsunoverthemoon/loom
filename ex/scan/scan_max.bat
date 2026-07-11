@@ -11,8 +11,6 @@ SET /A "tasks=10", "num.max=10"
 
 CALL LOOM "%~F0" CREATE_TREE %tasks%
 
-DEL /F /Q "%TEMP%\%~n0_out.txt" 2>NUL 1>NUL
-
 %threads%
 
 PAUSE>NUL
@@ -35,9 +33,8 @@ EXIT
 CALL :RECEIVE_MAX
 
 ECHO %id%:%max%
-(WAITFOR scan%id%)>NUL
+CALL :WAIT_FOR %id%
 
-SET /P prefix=<"%TEMP%\%~n0_%id%.txt"
 (ECHO %id% Prefix : %prefix%)>CON
 IF not "%children%" == "0" (
     CALL :SEND_MAX
@@ -45,17 +42,26 @@ IF not "%children%" == "0" (
 
 EXIT
 
+:WAIT_FOR <id>
+FOR /F "tokens=1-2 delims==" %%A in ('DOSKEY /MACROS:loom') DO (
+    IF "%%A" == "%1" (
+        SET "prefix=%%B"
+        GOTO :EOF
+    )
+)
+GOTO :WAIT_FOR
+
+
 :SEND_MAX
 SET "running=!prefix!"
 IF !own.max! GTR !running! (
     SET "running=!own.max!"
 )
 FOR %%C in (%children.id:.= %) DO (
-    (ECHO !running!)>"%TEMP%\%~n0_%%C.txt"
+    DOSKEY /EXENAME=loom %%C=!running!
     IF !child.max.%%C! GTR !running! (
         SET "running=!child.max.%%C!"
     )
-    (WAITFOR /SI scan%%C)>NUL
 )
 GOTO :EOF
 

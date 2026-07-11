@@ -36,22 +36,28 @@ EXIT
 CALL :RECEIVE_VAL
 
 ECHO %id%:!val!
-(WAITFOR scan%id%)>NUL
+CALL :WAIT_FOR %id%
 
-SET /P prefix=<"%TEMP%\%~n0_%id%.txt"
 (ECHO %id% Prefix : "!prefix!")>CON
 IF not "%children%" == "0" (
     CALL :SEND_VAL
 )
 EXIT
 
+:WAIT_FOR <id>
+FOR /F "tokens=1-2 delims==" %%A in ('DOSKEY /MACROS:loom') DO (
+    IF "%%A" == "%1" (
+        SET "prefix=%%B"
+        GOTO :EOF
+    )
+)
+GOTO :WAIT_FOR
+
 :SEND_VAL
 SET "running=!prefix!!own.val!"
 FOR %%C in (%children.id:.= %) DO (
-    SET "out=!running!"
-    (ECHO !out!)>"%TEMP%\%~n0_%%C.txt"
+    DOSKEY /EXENAME=loom %%C=!running!
     SET "running=!running!!child.val.%%C!"
-    (WAITFOR /SI scan%%C)>NUL
 )
 GOTO :EOF
 
