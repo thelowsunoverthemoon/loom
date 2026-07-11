@@ -258,7 +258,7 @@ CALL :CREATE_TREE 4
 %threads%
 ```
 
-To implement ```scan```, one can use the ```WAITFOR``` command (though a busy loop would work too) and use temporary files to implement the downward pass. Each thread only has one parent, so they can each wait for the parent to create the temporary file with the prefix. Note that in the examples a ```exclusive``` scan is implemented.
+To implement ```scan```, one can use the ```DOSKEY``` command through a busy loop. This avoids a temporary file because the DOSKEY commands are shared within a single CMD.exe process. Each thread only has one parent, so they can each wait for the parent a "macro" with the prefix. Note that in the examples a ```exclusive``` scan is implemented.
 
  There is a problem, however. While this works well, it is specialized to the ```reduce``` operation and ```scan``` operation (I only used temporary files because they would only be used once in the downward pass, not as general messages). If one wanted to implement message passing, then this solution falls apart. The reason is that pipes are unidirectional in Batch Script, so there is no way to send information "back".
 
