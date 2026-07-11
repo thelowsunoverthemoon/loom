@@ -43,11 +43,9 @@ IF not "%children%" == "0" (
 EXIT
 
 :WAIT_FOR <id>
-FOR /F "tokens=1-2 delims==" %%A in ('DOSKEY /MACROS:loom') DO (
-    IF "%%A" == "%1" (
-        SET "prefix=%%B"
-        GOTO :EOF
-    )
+FOR /F "tokens=1-2 delims==" %%A in ('DOSKEY /MACROS:loom%1') DO (
+    SET "prefix=%%B"
+    GOTO :EOF
 )
 GOTO :WAIT_FOR
 
@@ -58,7 +56,7 @@ IF !own.max! GTR !running! (
     SET "running=!own.max!"
 )
 FOR %%C in (%children.id:.= %) DO (
-    DOSKEY /EXENAME=loom %%C=!running!
+    DOSKEY /EXENAME=loom%%C v=!running!
     IF !child.max.%%C! GTR !running! (
         SET "running=!child.max.%%C!"
     )
